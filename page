@@ -1,0 +1,95 @@
+"use client"
+
+import React from "react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Dynamic imports with prefetch: false to reduce initial bundle size
+const Timer = React.lazy(() => import("@/components/timer"))
+const Dashboard = React.lazy(() => import("@/components/dashboard"))
+const Settings = React.lazy(() => import("@/components/settings"))
+
+// Loading fallbacks
+const TimerFallback = () => (
+  <div className="space-y-4">
+    <Skeleton className="h-8 w-full max-w-[200px] mx-auto" />
+    <Skeleton className="h-24 w-24 rounded-full mx-auto" />
+    <Skeleton className="h-4 w-full" />
+    <div className="flex justify-center space-x-4">
+      <Skeleton className="h-10 w-24" />
+      <Skeleton className="h-10 w-24" />
+    </div>
+  </div>
+)
+
+const DashboardFallback = () => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {[1, 2, 3].map((i) => (
+        <Skeleton key={i} className="h-24 w-full" />
+      ))}
+    </div>
+    <Skeleton className="h-[300px] w-full" />
+  </div>
+)
+
+const SettingsFallback = () => (
+  <div className="space-y-4">
+    <Skeleton className="h-8 w-full max-w-[200px]" />
+    <Skeleton className="h-4 w-full" />
+    <Skeleton className="h-12 w-full" />
+    <Skeleton className="h-12 w-full" />
+    <Skeleton className="h-10 w-32" />
+  </div>
+)
+
+export default function Home() {
+  const [activeTab, setActiveTab] = React.useState("timer")
+
+  // Only load the component for the active tab
+  const shouldLoadTimer = activeTab === "timer"
+  const shouldLoadDashboard = activeTab === "dashboard"
+  const shouldLoadSettings = activeTab === "settings"
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-center mb-8">Focus Flow</h1>
+
+      <Tabs defaultValue="timer" className="w-full max-w-3xl mx-auto" onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="timer">Timer</TabsTrigger>
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="timer" className="mt-6">
+          {shouldLoadTimer && (
+            <React.Suspense fallback={<TimerFallback />}>
+              <Timer />
+            </React.Suspense>
+          )}
+          {!shouldLoadTimer && <TimerFallback />}
+        </TabsContent>
+
+        <TabsContent value="dashboard" className="mt-6">
+          {shouldLoadDashboard && (
+            <React.Suspense fallback={<DashboardFallback />}>
+              <Dashboard />
+            </React.Suspense>
+          )}
+          {!shouldLoadDashboard && <DashboardFallback />}
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-6">
+          {shouldLoadSettings && (
+            <React.Suspense fallback={<SettingsFallback />}>
+              <Settings />
+            </React.Suspense>
+          )}
+          {!shouldLoadSettings && <SettingsFallback />}
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
