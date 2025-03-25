@@ -1,0 +1,135 @@
+"use client"
+
+import React from "react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
+import { Switch } from "@/components/ui/switch"
+import { useSettings } from "@/hooks/use-settings"
+import { useToast } from "@/hooks/use-toast"
+import { Save } from "lucide-react"
+
+// Separate the slider component to prevent unnecessary re-renders
+const TimerSlider = React.memo(({ id, label, value, min, max, step, onChange }) => {
+  return (
+    <div>
+      <div className="flex justify-between mb-2">
+        <Label htmlFor={id}>
+          {label}: {value} minutes
+        </Label>
+      </div>
+      <Slider id={id} min={min} max={max} step={step} value={[value]} onValueChange={(val) => onChange(val[0])} />
+    </div>
+  )
+})
+
+// Separate the switch component to prevent unnecessary re-renders
+const SettingSwitch = React.memo(({ id, label, description, checked, onChange }) => {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <Label htmlFor={id} className="block">
+          {label}
+        </Label>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+    </div>
+  )
+})
+
+export default function Settings() {
+  const { settings, updateSettings } = useSettings()
+  const { toast } = useToast()
+
+  const [formState, setFormState] = React.useState({
+    focusTime: settings.focusTime,
+    breakTime: settings.breakTime,
+    autoStartBreaks: settings.autoStartBreaks,
+    notifications: settings.notifications,
+  })
+
+  // Use useCallback to avoid recreating this function on each render
+  const handleSave = React.useCallback(() => {
+    updateSettings(formState)
+    toast({
+      title: "Settings saved",
+      description: "Your preferences have been updated.",
+    })
+  }, [formState, updateSettings, toast])
+
+  // Use useCallback for all state update functions
+  const setFocusTime = React.useCallback((value) => {
+    setFormState((prev) => ({ ...prev, focusTime: value }))
+  }, [])
+
+  const setBreakTime = React.useCallback((value) => {
+    setFormState((prev) => ({ ...prev, breakTime: value }))
+  }, [])
+
+  const setAutoStartBreaks = React.useCallback((value) => {
+    setFormState((prev) => ({ ...prev, autoStartBreaks: value }))
+  }, [])
+
+  const setNotifications = React.useCallback((value) => {
+    setFormState((prev) => ({ ...prev, notifications: value }))
+  }, [])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Settings</CardTitle>
+        <CardDescription>Customize your productivity timer</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <TimerSlider
+            id="focus-time"
+            label="Focus Session Duration"
+            value={formState.focusTime}
+            min={5}
+            max={120}
+            step={5}
+            onChange={setFocusTime}
+          />
+
+          <TimerSlider
+            id="break-time"
+            label="Break Duration"
+            value={formState.breakTime}
+            min={1}
+            max={30}
+            step={1}
+            onChange={setBreakTime}
+          />
+        </div>
+
+        <div className="space-y-4">
+          <SettingSwitch
+            id="auto-breaks"
+            label="Auto-start Breaks"
+            description="Automatically start breaks after focus sessions"
+            checked={formState.autoStartBreaks}
+            onChange={setAutoStartBreaks}
+          />
+
+          <SettingSwitch
+            id="notifications"
+            label="Notifications"
+            description="Receive notifications when sessions end"
+            checked={formState.notifications}
+            onChange={setNotifications}
+          />
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button onClick={handleSave}>
+          <Save className="mr-2 h-4 w-4" />
+          Save Settings
+        </Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
