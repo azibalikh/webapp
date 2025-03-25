@@ -1,0 +1,54 @@
+import type React from "react"
+import "@/app/globals.css"
+import { Inter } from "next/font/google"
+import { ThemeProvider } from "@/components/theme-provider"
+import { SettingsProvider } from "@/hooks/use-settings"
+import { ProductivityProvider } from "@/hooks/use-productivity-data"
+
+// Optimize font loading
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  preload: true,
+  weight: ["400", "500", "700"],
+})
+
+export const metadata = {
+  title: "Focus Flow - Productivity Timer",
+  description: "A productivity app with customizable timers and tracking",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "white" },
+    { media: "(prefers-color-scheme: dark)", color: "black" },
+  ],
+  manifest: "/manifest.json",
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <meta name="application-name" content="Focus Flow" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Focus Flow" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
+      <body className={inter.className}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <SettingsProvider>
+            <ProductivityProvider>{children}</ProductivityProvider>
+          </SettingsProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  )
+}
+
