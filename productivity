@@ -1,0 +1,155 @@
+"use client"
+
+import React from "react"
+
+type Session = {
+  date: string
+  duration: number
+  type: "focus" | "break"
+}
+
+type DailyData = {
+  date: string
+  minutes: number
+}
+
+type WeeklyData = {
+  week: string
+  minutes: number
+}
+
+type ProductivityContextType = {
+  sessions: Session[]
+  addSession: (session: Session) => void
+  getDailyData: () => DailyData[]
+  getWeeklyData: () => WeeklyData[]
+  getTotalFocusTime: () => number
+}
+
+const ProductivityContext = React.createContext<ProductivityContextType | undefined>(undefined)
+
+export function ProductivityProvider({ children }: { children: React.ReactNode }) {
+  const [sessions, setSessions] = React.useState<Session[]>([])
+
+  // Load sessions only once on mount
+  React.useEffect(() => {
+    try {
+      const savedSessions = localStorage.getItem("productivity-sessions")
+      if (savedSessions) {
+        setSessions(JSON.parse(savedSessions))
+      }
+    } catch (error) {
+      console.error("Failed to parse sessions:", error)
+    }
+  }, [])
+
+  // Memoize the addSession function to prevent unnecessary re-renders
+  const addSession = React.useCallback((session: Session) => {
+    setSessions((prev) => {
+      const newSessions = [...prev, session]
+      try {
+        localStorage.setItem("productivity-sessions", JSON.stringify(newSessions))
+      } catch (error) {
+        console.error("Failed to save sessions:", error)
+      }
+      return newSessions
+    })
+  }, [])
+
+  // Memoize these functions to prevent unnecessary recalculations
+  const getDailyData = React.useCallback((): DailyData[] => {
+    const focusSessions = sessions.filter((s) => s.type === "focus")
+    const dailyMap = new Map<string, number>()
+
+    // Get last 7 days
+    const dates = []
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      const dateStr = date.toISOString().split("T")[0]
+      dates.push(dateStr)
+      dailyMap.set(dateStr, 0)
+    }
+
+    // Sum up focus minutes by day
+    focusSessions.forEach((session) => {
+      if (dailyMap.has(session.date)) {
+        dailyMap.set(session.date, (dailyMap.get(session.date) || 0) + session.duration)
+      }
+    })
+
+    // Convert to array format for chart
+    return dates.map((date) => ({
+      date: date.split("-").slice(1).join("/"), // Format as MM/DD
+      minutes: dailyMap.get(date) || 0,
+    }))
+  }, [sessions])
+
+  const getWeeklyData = React.useCallback((): WeeklyData[] => {
+    const focusSessions = sessions.filter((s) => s.type === "focus")
+    const weeklyMap = new Map<string, number>()
+
+    // Get last 4 weeks
+    const weeks = []
+    for (let i = 3; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(date.getDate() - i * 7)
+      const weekStart = new Date(date)
+      weekStart.setDate(date.getDate() - date.getDay())
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6)
+
+      const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`
+      weeks.push(weekLabel)
+      weeklyMap.set(weekLabel, 0)
+    }
+
+    // Group sessions by week
+    focusSessions.forEach((session) => {
+      const sessionDate = new Date(session.date)
+      const weekStart = new Date(sessionDate)
+      weekStart.setDate(sessionDate.getDate() - sessionDate.getDay())
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6)
+
+      const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`
+
+      if (weeklyMap.has(weekLabel)) {
+        weeklyMap.set(weekLabel, (weeklyMap.get(weekLabel) || 0) + session.duration)
+      }
+    })
+
+    // Convert to array format for chart
+    return weeks.map((week) => ({
+      week,
+      minutes: weeklyMap.get(week) || 0,
+    }))
+  }, [sessions])
+
+  const getTotalFocusTime = React.useCallback((): number => {
+    return sessions.filter((s) => s.type === "focus").reduce((total, session) => total + session.duration, 0)
+  }, [sessions])
+
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = React.useMemo(
+    () => ({
+      sessions,
+      addSession,
+      getDailyData,
+      getWeeklyData,
+      getTotalFocusTime,
+    }),
+    [sessions, addSession, getDailyData, getWeeklyData, getTotalFocusTime],
+  )
+
+  return <ProductivityContext.Provider value={contextValue}>{children}</ProductivityContext.Provider>
+}
+
+export function useProductivityData() {
+  const context = React.useContext(ProductivityContext)
+  if (context === undefined) {
+    throw new Error("useProductivityData must be used within a ProductivityProvider")
+  }
+  return context
+}
+
