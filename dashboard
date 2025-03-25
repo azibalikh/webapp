@@ -1,0 +1,109 @@
+"use client"
+
+import React from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useProductivityData } from "@/hooks/use-productivity-data"
+import { Clock, Calendar, TrendingUp } from "lucide-react"
+
+export default function Dashboard() {
+  const { sessions, getDailyData, getTotalFocusTime } = useProductivityData()
+
+  // Memoize expensive calculations
+  const dailyData = React.useMemo(() => getDailyData(), [sessions])
+  const totalFocusMinutes = React.useMemo(() => getTotalFocusTime(), [sessions])
+  const totalSessions = React.useMemo(() => sessions.filter((s) => s.type === "focus").length, [sessions])
+  const dailyAverage = React.useMemo(
+    () => (dailyData.length > 0 ? Math.round(totalFocusMinutes / dailyData.length) : 0),
+    [dailyData.length, totalFocusMinutes],
+  )
+
+  const formatHours = (minutes: number) => {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Focus Time</CardDescription>
+            <CardTitle className="flex items-center">
+              <Clock className="mr-2 h-4 w-4 text-primary" />
+              {formatHours(totalFocusMinutes)}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Focus Sessions</CardDescription>
+            <CardTitle className="flex items-center">
+              <Calendar className="mr-2 h-4 w-4 text-primary" />
+              {totalSessions}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Daily Average</CardDescription>
+            <CardTitle className="flex items-center">
+              <TrendingUp className="mr-2 h-4 w-4 text-primary" />
+              {formatHours(dailyAverage)}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Productivity Overview</CardTitle>
+          <CardDescription>Track your focus time over time</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] w-full">
+            <LightweightBarChart data={dailyData} />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// A lightweight custom chart implementation instead of recharts
+function LightweightBarChart({ data }) {
+  const maxValue = React.useMemo(() => {
+    return Math.max(...data.map((item) => item.minutes), 10)
+  }, [data])
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 flex items-end">
+        <div className="w-12 h-full flex flex-col justify-between text-xs text-muted-foreground">
+          {[...Array(5)].map((_, i) => (
+            <div key={i}>{Math.round((maxValue * (4 - i)) / 4)}</div>
+          ))}
+          <div>0</div>
+        </div>
+        <div className="flex-1 h-full flex items-end">
+          {data.map((item, index) => {
+            const height = item.minutes ? (item.minutes / maxValue) * 100 : 0
+            return (
+              <div key={index} className="flex-1 flex flex-col items-center">
+                <div
+                  className="w-4/5 bg-primary rounded-t-sm"
+                  style={{ height: `${height}%` }}
+                  title={`${item.date}: ${item.minutes} minutes`}
+                ></div>
+                <div className="text-xs mt-1 text-muted-foreground">{item.date}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
