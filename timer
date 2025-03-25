@@ -1,0 +1,173 @@
+"use client"
+
+import React from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Play, Pause, RotateCcw, Coffee } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { useSettings } from "@/hooks/use-settings"
+import { useProductivityData } from "@/hooks/use-productivity-data"
+
+// Separate the timer display to prevent unnecessary re-renders
+const TimerDisplay = React.memo(({ timeLeft }) => {
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
+
+  return <div className="text-6xl font-bold my-8">{formatTime(timeLeft)}</div>
+})
+
+// Separate the progress bar to prevent unnecessary re-renders
+const ProgressBar = React.memo(({ progress }) => {
+  return <Progress value={progress} className="w-full h-2" />
+})
+
+// Separate the mode selector to prevent unnecessary re-renders
+const ModeSelector = React.memo(({ mode, switchMode }) => {
+  return (
+    <div className="flex items-center justify-center w-full">
+      <Button
+        variant={mode === "focus" ? "default" : "outline"}
+        className="rounded-r-none px-8"
+        onClick={() => mode === "break" && switchMode()}
+      >
+        Focus
+      </Button>
+      <Button
+        variant={mode === "break" ? "default" : "outline"}
+        className="rounded-l-none px-8"
+        onClick={() => mode === "focus" && switchMode()}
+      >
+        <Coffee className="mr-2 h-4 w-4" />
+        Break
+      </Button>
+    </div>
+  )
+})
+
+// Separate the control buttons to prevent unnecessary re-renders
+const ControlButtons = React.memo(({ isActive, toggleTimer, resetTimer }) => {
+  return (
+    <div className="flex space-x-4 mt-6">
+      <Button size="lg" onClick={toggleTimer} aria-label={isActive ? "Pause timer" : "Start timer"}>
+        {isActive ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+        {isActive ? "Pause" : "Start"}
+      </Button>
+      <Button size="lg" variant="outline" onClick={resetTimer} aria-label="Reset timer">
+        <RotateCcw className="mr-2 h-4 w-4" />
+        Reset
+      </Button>
+    </div>
+  )
+})
+
+export default function Timer() {
+  const { toast } = useToast()
+  const { settings } = useSettings()
+  const { addSession } = useProductivityData()
+
+  const [mode, setMode] = React.useState("focus")
+  const [timeLeft, setTimeLeft] = React.useState(settings.focusTime * 60)
+  const [isActive, setIsActive] = React.useState(false)
+  const [progress, setProgress] = React.useState(100)
+
+  const totalTime = React.useMemo(
+    () => (mode === "focus" ? settings.focusTime * 60 : settings.breakTime * 60),
+    [mode, settings.focusTime, settings.breakTime],
+  )
+
+  // Use useRef to avoid recreating the interval function on each render
+  const intervalRef = React.useRef(null)
+
+  // Use useCallback to avoid recreating these functions on each render
+  const toggleTimer = React.useCallback(() => {
+    setIsActive((prev) => !prev)
+  }, [])
+
+  const resetTimer = React.useCallback(() => {
+    setIsActive(false)
+    setTimeLeft(mode === "focus" ? settings.focusTime * 60 : settings.breakTime * 60)
+    setProgress(100)
+  }, [mode, settings.focusTime, settings.breakTime])
+
+  const switchMode = React.useCallback(() => {
+    setIsActive(false)
+    if (mode === "focus") {
+      setMode("break")
+      setTimeLeft(settings.breakTime * 60)
+    } else {
+      setMode("focus")
+      setTimeLeft(settings.focusTime * 60)
+    }
+    setProgress(100)
+  }, [mode, settings.breakTime, settings.focusTime])
+
+  // Handle timer logic with useEffect
+  React.useEffect(() => {
+    if (isActive && timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          const newTime = prev - 1
+          setProgress((newTime / totalTime) * 100)
+          return newTime
+        })
+      }, 1000)
+    } else if (isActive && timeLeft === 0) {
+      setIsActive(false)
+
+      // Use setTimeout to defer non-critical work
+      setTimeout(() => {
+        if (mode === "focus") {
+          toast({
+            title: "Focus session completed!",
+            description: "Time for a break.",
+          })
+          addSession({
+            date: new Date().toISOString().split("T")[0],
+            duration: settings.focusTime,
+            type: "focus",
+          })
+          setMode("break")
+          setTimeLeft(settings.breakTime * 60)
+          setProgress(100)
+        } else {
+          toast({
+            title: "Break completed!",
+            description: "Ready for another focus session?",
+          })
+          addSession({
+            date: new Date().toISOString().split("T")[0],
+            duration: settings.breakTime,
+            type: "break",
+          })
+          setMode("focus")
+          setTimeLeft(settings.focusTime * 60)
+          setProgress(100)
+        }
+      }, 0)
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [isActive, timeLeft, mode, settings, toast, addSession, totalTime])
+
+  return (
+    <Card className="w-full">
+      <CardContent className="pt-6">
+        <div className="flex flex-col items-center space-y-6">
+          <ModeSelector mode={mode} switchMode={switchMode} />
+          <TimerDisplay timeLeft={timeLeft} />
+          <ProgressBar progress={progress} />
+          <ControlButtons isActive={isActive} toggleTimer={toggleTimer} resetTimer={resetTimer} />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
